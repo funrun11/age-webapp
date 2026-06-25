@@ -74,6 +74,24 @@
         WASI,
         init,
       } from "https://cdn.jsdelivr.net/npm/@wasmer/wasi@1.2.2/dist/Library.esm.js";
+
+      function parseHashParams() {
+        const hash = window.location.hash.substr(1);
+        return Object.fromEntries(new URLSearchParams(hash));
+      }
+
+      function updateRecipientFromHash() {
+        const params = parseHashParams();
+        const recipientInput = document.getElementById("recipientInput");
+        if (params.to && params.to !== recipientInput.dataset.lastTo) {
+          recipientInput.value = params.to.split(",").join("\n");
+          recipientInput.dataset.lastTo = params.to;
+        }
+      }
+
+      updateRecipientFromHash();
+      window.addEventListener("hashchange", updateRecipientFromHash);
+
       await init();
 
       const modulePromise = (async () => {
@@ -139,23 +157,6 @@
 
         return supportedKeys;
       }
-
-      function parseHashParams() {
-        const hash = window.location.hash.substr(1);
-        return Object.fromEntries(new URLSearchParams(hash));
-      }
-
-      function updateRecipientFromHash() {
-        const params = parseHashParams();
-        const recipientInput = document.getElementById("recipientInput");
-        if (params.to && params.to !== recipientInput.dataset.lastTo) {
-          recipientInput.value = params.to.split(",").join("\n");
-          recipientInput.dataset.lastTo = params.to;
-        }
-      }
-
-      window.addEventListener("load", updateRecipientFromHash);
-      window.addEventListener("hashchange", updateRecipientFromHash);
 
       document
         .getElementById("encryptButton")
