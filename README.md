@@ -6,12 +6,11 @@ A simple web application that allows users to encrypt messages using the [Age en
 
 - Encrypt messages using Age encryption
 - Support for multiple recipients
-- GitHub integration: Encrypt messages for GitHub users using their SSH signing keys
 - Copy encrypted messages to clipboard
 
 ## Usage
 
-1. Enter recipient keys or GitHub usernames (prefixed with @) in the "Recipient Keys" textarea, one per line.
+1. Enter recipient keys in the "Recipient Keys" textarea, one per line.
 2. Type or paste the message you want to encrypt in the "Message to Encrypt" textarea.
 3. Click the "Encrypt" button to generate the encrypted message.
 4. The encrypted message will appear in the "Encrypted Message" textarea.
@@ -47,7 +46,6 @@ To run the app locally:
 - HTML, CSS, JavaScript
 - Bootstrap 5
 - WebAssembly (Age encryption tool)
-- GitHub API (for fetching SSH signing keys)
 
 ## Compiling the WebAssembly File
 
