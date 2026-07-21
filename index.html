@@ -17,16 +17,16 @@
 
       <div class="mb-3">
         <label for="recipientInput" class="form-label"
-          >Recipient Keys or GitHub @username (one per line)</label
+          >Recipient Keys (one per line)</label
         >
         <textarea
           class="form-control"
           id="recipientInput"
           rows="2"
-          placeholder="Enter recipient keys or GitHub usernames"
+          placeholder="Enter recipient keys"
         ></textarea>
         <p class="form-text">
-          Tip: You can pre-fill the recipient using a URL like #to=@username
+          Tip: You can pre-fill the recipient using a URL like #to=age1...
         </p>
       </div>
 
@@ -121,47 +121,6 @@
         return { stdout, stderr, exitCode };
       }
 
-      async function fetchGitHubKeys(username) {
-        // Check if the keys are already in sessionStorage
-        const cachedKeys = sessionStorage.getItem(`github_keys_${username}`);
-        if (cachedKeys) {
-          return JSON.parse(cachedKeys);
-        }
-
-        const response = await fetch(
-          `https://api.github.com/users/${username}/ssh_signing_keys`
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch GitHub keys for ${username}`);
-        }
-        const data = await response.json();
-        if (data.length === 0) {
-          throw new Error(`No SSH signing keys found for ${username}`);
-        }
-
-        // Filter for supported key types and extract the key data
-        const supportedKeys = data
-          .filter(
-            (key) =>
-              key.key.startsWith("ssh-rsa") || key.key.startsWith("ssh-ed25519")
-          )
-          .map((key) => key.key);
-
-        if (supportedKeys.length === 0) {
-          throw new Error(
-            `No supported SSH signing keys found for ${username}`
-          );
-        }
-
-        // Store the keys in sessionStorage
-        sessionStorage.setItem(
-          `github_keys_${username}`,
-          JSON.stringify(supportedKeys)
-        );
-
-        return supportedKeys;
-      }
-
       document
         .getElementById("encryptButton")
         .addEventListener("click", async () => {
@@ -170,42 +129,19 @@
           const messageInput = document.getElementById("messageInput").value;
           const encryptedOutput = document.getElementById("encryptedOutput");
           encryptedOutput.disabled = true;
-          encryptedOutput.value = "Loading recipient keys...";
-          const warnings = [];
           try {
             const recipients = recipientInput
               .split("\n")
               .map((line) => line.trim())
               .filter((line) => !!line);
-            const processedRecipients = (
-              await Promise.all(
-                recipients.map(async (recipient) => {
-                  if (recipient.startsWith("@")) {
-                    try {
-                      return await fetchGitHubKeys(recipient.substr(1));
-                    } catch (error) {
-                      console.error(error);
-                      warnings.push(
-                        `Unable to fetch keys for ${recipient}: ${error.message}`
-                      );
-                      return [];
-                    }
-                  }
-                  return recipient;
-                })
-              )
-            ).flat();
 
             try {
               encryptedOutput.value = "Encrypting...";
-              const result = await encrypt(messageInput, processedRecipients);
+              const result = await encrypt(messageInput, recipients);
               if (result.exitCode === 0) {
                 encryptedOutput.value = result.stdout;
               } else {
                 encryptedOutput.value =
-                  warnings
-                    .map((warning) => `Warning: ${warning}\n\n`)
-                    .join("") +
                   `Error: ${result.stderr}\nExit code: ${result.exitCode}`;
               }
             } catch (error) {
