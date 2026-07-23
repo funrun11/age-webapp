@@ -100,6 +100,24 @@
         ..."🌉🎑🌃🌌🌠🌟🌙⛅⛈⛄🔥💧🌊🌈🚦🚥🔔🥁🎷🎻🏀⚽🏈🎾🎱🏓🥊🏆🥇🎯🎲🎮",
       ];
 
+      // Trubetskoy's "20 simple, distinct colors" (first 12), with red, blue,
+      // purple and teal lightened and lavender swapped for mint so every step
+      // clears 4.5:1 on the dark surface. https://sashamaps.net/docs/resources/20-colors/
+      const LABEL_COLORS = [
+        "#ff4d6d", // red
+        "#3cb44b", // green
+        "#ffe119", // yellow
+        "#7b93ff", // blue
+        "#f58231", // orange
+        "#c77dff", // purple
+        "#46f0f0", // cyan
+        "#f032e6", // magenta
+        "#bcf60c", // lime
+        "#fabebe", // pink
+        "#22b8b8", // teal
+        "#aaffc3", // mint
+      ];
+
       function normalizeRecipients(text) {
         return [
           ...new Set(
@@ -111,31 +129,54 @@
         ].sort();
       }
 
+      async function sha256(input) {
+        const bytes =
+          typeof input === "string" ? new TextEncoder().encode(input) : input;
+        return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+      }
+
       async function fingerprintOf(recipients) {
         if (!recipients.length) return null;
-        const data = new TextEncoder().encode(recipients.join("\n"));
-        const digest = new Uint8Array(
-          await crypto.subtle.digest("SHA-256", data),
-        );
+        const digest = await sha256(recipients.join("\n"));
         return [...digest.slice(0, 4)]
           .map((byte) => FINGERPRINT_EMOJI[byte])
           .join("");
+      }
+
+      // Colour is keyed on the hash of the keys *and* the hash of the label, so
+      // the same keys under a different label read as a different pairing.
+      async function labelColorOf(recipients, label) {
+        if (!recipients.length) return null;
+        const keysHash = await sha256(recipients.join("\n"));
+        const labelHash = await sha256(label);
+        const digest = await sha256(
+          new Uint8Array([...keysHash, ...labelHash]),
+        );
+        return LABEL_COLORS[
+          (((digest[0] << 8) | digest[1]) >>> 0) % LABEL_COLORS.length
+        ];
       }
 
       let fingerprintSeq = 0;
       async function updateFingerprint() {
         const seq = ++fingerprintSeq;
         const el = document.getElementById("keyFingerprint");
+        const titleEl = document.getElementById("appTitle");
         const recipients = normalizeRecipients(
           document.getElementById("recipientInput").value,
         );
         let emoji = null;
+        let color = null;
         try {
-          emoji = await fingerprintOf(recipients);
+          [emoji, color] = await Promise.all([
+            fingerprintOf(recipients),
+            labelColorOf(recipients, titleEl.textContent),
+          ]);
         } catch {
           // crypto.subtle is unavailable (insecure context) — keep the placeholder
         }
         if (seq !== fingerprintSeq) return;
+        titleEl.style.color = color ?? "";
         el.textContent = emoji ?? "◌◌◌◌";
         el.style.opacity = emoji ? "1" : "0.35";
         el.title = emoji
@@ -160,7 +201,6 @@
         if (params.to && params.to !== recipientInput.dataset.lastTo) {
           recipientInput.value = params.to.split(",").join("\n");
           recipientInput.dataset.lastTo = params.to;
-          updateFingerprint();
         }
       }
 
@@ -173,12 +213,12 @@
       }
 
       function updateFromHash() {
+        updateTitleFromHash(); // before updateFingerprint: the colour hashes it
         updateRecipientFromHash();
-        updateTitleFromHash();
+        updateFingerprint();
       }
 
       updateFromHash();
-      updateFingerprint();
       window.addEventListener("hashchange", updateFromHash);
 
       await init();
