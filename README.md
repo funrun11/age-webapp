@@ -6,6 +6,8 @@ A simple web application that allows users to encrypt messages using the [Age en
 
 - Encrypt messages using Age encryption
 - Support for multiple recipients
+- Emoji fingerprint of the recipient keys, shown next to the title, so you can
+  recognize at a glance which keys are loaded
 - Copy encrypted messages to clipboard
 
 ## Usage

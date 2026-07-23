@@ -13,7 +13,16 @@
   </head>
   <body>
     <div class="container mt-5">
-      <h1 class="mb-4">Age Encryption Web App</h1>
+      <h1 class="mb-4">
+        Age Encryption Web App
+        <span
+          id="keyFingerprint"
+          class="ms-2 align-middle"
+          style="letter-spacing: 0.1em; opacity: 0.35"
+          title="Recipient key fingerprint"
+          >◌◌◌◌</span
+        >
+      </h1>
 
       <div class="mb-3">
         <label for="recipientInput" class="form-label"
@@ -79,6 +88,67 @@
         init,
       } from "https://cdn.jsdelivr.net/npm/@wasmer/wasi@1.2.2/dist/Library.esm.js";
 
+      // 256 visually distinct emoji: 4 of them encode 32 bits of the key hash.
+      const FINGERPRINT_EMOJI = [
+        ..."🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🐔🐧🐦🐤🦆🦅🦉🦇🐺🐗🐴🦄🐝🐛🦋🐌🐞",
+        ..."🐜🦂🐢🐍🦎🐙🦑🦐🦀🐡🐠🐬🐳🦈🐊🐆🐘🦏🐪🦒🦘🦌🦓🦍🐓🦃🦜🐇🐑🐖🦔🦚",
+        ..."🌵🌲🌳🌴🌱🌿🍀🎍🍃🍄🌰🌹🌻🌼🌷🌸💐🍇🍈🍉🍊🍋🍌🍍🥭🍎🍐🍑🍒🍓🥝🍅",
+        ..."🥥🥑🍆🥔🥕🌽🥒🥦🧄🧅🥜🌾🍞🥐🥨🧀🍖🍗🍔🍟🍕🌭🌮🌯🥗🍿🥚🍳🥞🍦🍩🍪",
+        ..."⌚📱💻📼📀💽💾💿📷📸📹🎥📞📟📠📺📻🧭⏰⌛⏳📡🔋🔌💡🔦🧯💸💵💎🧰🔧",
+        ..."🔨🔩🧲🔫💣🔪🚬🏺🔮🧿🧸🎈🎉🎁🎀🔑🔐🔒📌📎📏📐📕📗📘📙📚📒📝📓📔📰",
+        ..."🚀🛸🚁🚂🚃🚌🚑🚒🚓🚕🚗🚚🚜🚲🛴⛵🚤⚓🚧⛽🗿🗽🏰🏯🎡🎢🎠⛲🌋🗻⛺🌁",
+        ..."🌉🎑🌃🌌🌠🌟🌙⛅⛈⛄🔥💧🌊🌈🚦🚥🔔🥁🎷🎻🏀⚽🏈🎾🎱🏓🥊🏆🥇🎯🎲🎮",
+      ];
+
+      function normalizeRecipients(text) {
+        return [
+          ...new Set(
+            text
+              .split("\n")
+              .map((line) => line.trim())
+              .filter((line) => !!line),
+          ),
+        ].sort();
+      }
+
+      async function fingerprintOf(recipients) {
+        if (!recipients.length) return null;
+        const data = new TextEncoder().encode(recipients.join("\n"));
+        const digest = new Uint8Array(
+          await crypto.subtle.digest("SHA-256", data),
+        );
+        return [...digest.slice(0, 4)]
+          .map((byte) => FINGERPRINT_EMOJI[byte])
+          .join("");
+      }
+
+      let fingerprintSeq = 0;
+      async function updateFingerprint() {
+        const seq = ++fingerprintSeq;
+        const el = document.getElementById("keyFingerprint");
+        const recipients = normalizeRecipients(
+          document.getElementById("recipientInput").value,
+        );
+        let emoji = null;
+        try {
+          emoji = await fingerprintOf(recipients);
+        } catch {
+          // crypto.subtle is unavailable (insecure context) — keep the placeholder
+        }
+        if (seq !== fingerprintSeq) return;
+        el.textContent = emoji ?? "◌◌◌◌";
+        el.style.opacity = emoji ? "1" : "0.35";
+        el.title = emoji
+          ? `Fingerprint of ${recipients.length} recipient key${
+              recipients.length === 1 ? "" : "s"
+            }`
+          : "Recipient key fingerprint";
+      }
+
+      document
+        .getElementById("recipientInput")
+        .addEventListener("input", updateFingerprint);
+
       function parseHashParams() {
         const hash = window.location.hash.substr(1);
         return Object.fromEntries(new URLSearchParams(hash));
@@ -90,10 +160,12 @@
         if (params.to && params.to !== recipientInput.dataset.lastTo) {
           recipientInput.value = params.to.split(",").join("\n");
           recipientInput.dataset.lastTo = params.to;
+          updateFingerprint();
         }
       }
 
       updateRecipientFromHash();
+      updateFingerprint();
       window.addEventListener("hashchange", updateRecipientFromHash);
 
       await init();
